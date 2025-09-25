@@ -4,24 +4,26 @@ import rl "vendor:raylib"
 
 import "core:fmt"
 
-window_width :: 800
-window_height :: 450
-
+// window
+WINDOW_WIDTH :: 900
+WINDOW_HEIGHT :: 600
+WINDOW_TITLE :: "Bricks"
+WINDOW_FPS :: 60
 
 // brick
-brick_width :: 100
-brick_height :: 20
-brick_rows :: 4
-brick_cols :: 8
+BRICK_WIDTH :: 100
+BRICK_HEIGHT :: 20
+BRICK_ROWS :: 4
+BRICK_COLS :: 8
 
 //ball
-ball_width :: 10
-ball_height :: 10
+BALL_WIDTH :: 10
+BALL_HEIGHT :: 10
 
 
 //bat
-bat_width :: 100
-bat_height :: 12
+BAT_WIDTH :: 100
+BAT_HEIGHT :: 12
 
 GameState :: enum {
 	Start,
@@ -50,17 +52,24 @@ Brick :: struct {
 }
 
 init_bricks :: proc() -> []Brick {
-	bricks := make([]Brick, brick_rows * brick_cols)
+	bricks := make([]Brick, BRICK_ROWS * BRICK_COLS)
 
-	for row in 0 ..< brick_rows {
-		for col in 0 ..< brick_cols {
-			idx := row * brick_cols + col
+	spacing: f32 = 10.0
+
+	total_width := f32(BRICK_COLS) * BRICK_WIDTH + f32(BRICK_COLS - 1) * spacing
+
+	start_x := f32(WINDOW_WIDTH) / 2 - total_width / 2
+	start_y := f32(50)
+
+	for row in 0 ..< BRICK_ROWS {
+		for col in 0 ..< BRICK_COLS {
+			idx := row * BRICK_COLS + col
 			bricks[idx] = Brick {
 				rect = rl.Rectangle {
-					x = cast(f32)(col * (brick_width + 10)) + 10,
-					y = cast(f32)(row * (brick_height + 10)) + 50,
-					width = brick_width,
-					height = brick_height,
+					x = start_x + f32(col) * (BRICK_WIDTH + spacing),
+					y = start_y + f32(row) * (BRICK_HEIGHT + spacing),
+					width = BRICK_WIDTH,
+					height = BRICK_HEIGHT,
 				},
 				color = rl.BROWN,
 				active = true,
@@ -71,14 +80,16 @@ init_bricks :: proc() -> []Brick {
 	return bricks
 }
 
-
 update_game :: proc(ball: ^Ball, bat: ^Bat, bricks: []Brick) {
+	delta_time := rl.GetFrameTime()
+	ball_speed: f32 = 200.0
+	bat_speed: f32 = 300.0
 	// move ball
-	ball.rect.y -= ball.velY
-	ball.rect.x += ball.velX
+	ball.rect.y += ball.velY * delta_time
+	ball.rect.x += ball.velX * delta_time
 
 	// colliding against walls
-	if ball.rect.x <= 0 || ball.rect.x + ball.rect.width >= window_width {
+	if ball.rect.x <= 0 || ball.rect.x + ball.rect.width >= WINDOW_WIDTH {
 		ball.velX = -ball.velX
 	}
 	if ball.rect.y <= 0 {
@@ -89,17 +100,19 @@ update_game :: proc(ball: ^Ball, bat: ^Bat, bricks: []Brick) {
 	if rl.CheckCollisionRecs(ball.rect, bat.rect) {
 		ball.velY = -ball.velY
 		ball.rect.y = bat.rect.y - ball.rect.height
+		hit_pos := (ball.rect.x + ball.rect.width / 2 - bat.rect.x) / bat.rect.width
+		ball.velX = 6.0 * (hit_pos - 0.5) * 2.0
 	}
 
 	// move bat
 	if rl.IsKeyDown(.RIGHT) {
-		if bat.rect.x + bat.rect.width <= window_width {
-			bat.rect.x += 4
+		if bat.rect.x + bat.rect.width <= WINDOW_WIDTH {
+			bat.rect.x += bat_speed * delta_time
 		}
 	}
 	if rl.IsKeyDown(.LEFT) {
 		if bat.rect.x >= 0 {
-			bat.rect.x -= 4
+			bat.rect.x -= bat_speed * delta_time
 		}
 	}
 
@@ -107,7 +120,16 @@ update_game :: proc(ball: ^Ball, bat: ^Bat, bricks: []Brick) {
 	for &brick in bricks {
 		if brick.active && rl.CheckCollisionRecs(ball.rect, brick.rect) {
 			brick.active = false
-			ball.velY = -ball.velY
+			overlap_left := ball.rect.x + ball.rect.width - brick.rect.x
+			overlap_right := brick.rect.x + brick.rect.width - ball.rect.x
+			overlap_top := ball.rect.y + ball.rect.height - brick.rect.y
+			overlap_bottom := brick.rect.y + brick.rect.height - ball.rect.y
+			min_overlap := min(overlap_left, overlap_right, overlap_top, overlap_bottom)
+			if min_overlap == overlap_left || min_overlap == overlap_right {
+				ball.velX = -ball.velX
+			} else {
+				ball.velY = -ball.velY
+			}
 		}
 	}
 }
@@ -123,12 +145,12 @@ draw_game :: proc(ball: Ball, bat: Bat, bricks: []Brick) {
 }
 
 reset_game :: proc(ball: ^Ball, bat: ^Bat, bricks: []Brick) {
-	ball.rect.x = window_width / 2 - 10 / 2
-	ball.rect.y = window_height - (window_height * 30 / 100) + 10
-	ball.velX = 4
-	ball.velY = 4
-	bat.rect.x = window_width / 2 - 100 / 2
-	bat.rect.y = window_height - (window_height * 20 / 100)
+	ball.rect.x = WINDOW_WIDTH / 2 - 10 / 2
+	ball.rect.y = WINDOW_HEIGHT - (WINDOW_HEIGHT * 30 / 100) + 10
+	ball.velX = 200.0
+	ball.velY = -200.0
+	bat.rect.x = WINDOW_WIDTH / 2 - 100 / 2
+	bat.rect.y = WINDOW_HEIGHT - (WINDOW_HEIGHT * 20 / 100)
 	for &brick in bricks {
 		if !brick.active {
 			brick.active = true
@@ -138,8 +160,9 @@ reset_game :: proc(ball: ^Ball, bat: ^Bat, bricks: []Brick) {
 }
 
 main :: proc() {
-	rl.InitWindow(window_width, window_height, "Window the window")
-	rl.SetTargetFPS(60)
+	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
+	rl.SetWindowState({rl.ConfigFlag.WINDOW_RESIZABLE})
+	rl.SetTargetFPS(WINDOW_FPS)
 
 	state := GameState.Start
 
@@ -147,24 +170,24 @@ main :: proc() {
 	defer delete(bricks)
 
 	ball_rect := rl.Rectangle {
-		x      = window_width / 2 - 10 / 2,
-		y      = window_height - (window_height * 30 / 100) + 10,
-		width  = ball_width,
-		height = ball_height,
+		x      = f32(rl.GetScreenWidth()) / 2 - 10 / 2,
+		y      = f32(rl.GetScreenHeight()) - (f32(rl.GetScreenHeight()) * 30 / 100) + 10,
+		width  = BALL_WIDTH,
+		height = BALL_HEIGHT,
 	}
 
 	bat_rect := rl.Rectangle {
-		x      = window_width / 2 - 100 / 2,
-		y      = window_height - (window_height * 20 / 100),
-		width  = bat_width,
-		height = bat_height,
+		x      = f32(rl.GetScreenWidth()) / 2 - 100 / 2,
+		y      = f32(rl.GetScreenHeight()) - (f32(rl.GetScreenHeight()) * 20 / 100),
+		width  = BAT_WIDTH,
+		height = BAT_HEIGHT,
 	}
 
 	ball := Ball {
 		rect  = ball_rect,
 		color = rl.GREEN,
-		velX  = 4,
-		velY  = 4,
+		velX  = 200.0,
+		velY  = -200.0,
 	}
 
 	bat := Bat {
@@ -176,6 +199,9 @@ main :: proc() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.BLACK)
 
+		screenWidth := rl.GetScreenWidth()
+		screenHeight := rl.GetScreenHeight()
+
 		switch state {
 		case .Start:
 			draw_game(ball, bat, bricks)
@@ -184,8 +210,8 @@ main :: proc() {
 			text_width := rl.MeasureText(msg, font_size)
 			rl.DrawText(
 				msg,
-				window_width / 2 - text_width / 2,
-				window_height / 2,
+				screenWidth / 2 - text_width / 2,
+				screenHeight / 2,
 				font_size,
 				rl.WHITE,
 			)
@@ -200,7 +226,7 @@ main :: proc() {
 
 			update_game(&ball, &bat, bricks)
 			draw_game(ball, bat, bricks)
-			if ball.rect.y > window_height {
+			if ball.rect.y > f32(screenHeight) {
 				state = .GameOver
 			}
 
@@ -223,8 +249,8 @@ main :: proc() {
 			draw_game(ball, bat, bricks)
 			rl.DrawText(
 				msg,
-				window_width / 2 - text_width / 2,
-				window_height / 2,
+				screenWidth / 2 - text_width / 2,
+				screenHeight / 2,
 				font_size,
 				rl.WHITE,
 			)
@@ -237,13 +263,7 @@ main :: proc() {
 			font_size: i32 = 20
 			text_width := rl.MeasureText(msg, font_size)
 			draw_game(ball, bat, bricks)
-			rl.DrawText(
-				msg,
-				window_width / 2 - text_width / 2,
-				window_height / 2,
-				font_size,
-				rl.RED,
-			)
+			rl.DrawText(msg, screenWidth / 2 - text_width / 2, screenHeight / 2, font_size, rl.RED)
 			if rl.IsKeyPressed(.R) {
 				reset_game(&ball, &bat, bricks)
 				state = .Start
@@ -255,8 +275,8 @@ main :: proc() {
 			text_width := rl.MeasureText(msg, font_size)
 			rl.DrawText(
 				msg,
-				window_width / 2 - text_width / 2,
-				window_height / 2,
+				screenWidth / 2 - text_width / 2,
+				screenHeight / 2,
 				font_size,
 				rl.GREEN,
 			)
