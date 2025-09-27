@@ -3,6 +3,7 @@ package main
 import rl "vendor:raylib"
 
 import "core:fmt"
+import "core:math"
 
 // window
 WINDOW_WIDTH :: 900
@@ -98,10 +99,20 @@ update_game :: proc(ball: ^Ball, bat: ^Bat, bricks: []Brick) {
 
 	// bat collision
 	if rl.CheckCollisionRecs(ball.rect, bat.rect) {
-		ball.velY = -ball.velY
 		ball.rect.y = bat.rect.y - ball.rect.height
-		hit_pos := (ball.rect.x + ball.rect.width / 2 - bat.rect.x) / bat.rect.width
-		ball.velX = 6.0 * (hit_pos - 0.5) * 2.0
+
+		hit_center := (ball.rect.x + ball.rect.width / 2) - (bat.rect.x + bat.rect.width / 2)
+		norm := hit_center / (bat.rect.width / 2)
+
+		max_angle: f32 = 1.0472
+
+		angle := norm * max_angle
+
+		speed := math.sqrt(ball.velX * ball.velX + ball.velY * ball.velY)
+		if speed == 0 {speed = 6.0}
+
+		ball.velX = speed * math.sin(angle)
+		ball.velY = -speed * math.cos(angle)
 	}
 
 	// move bat
@@ -120,14 +131,25 @@ update_game :: proc(ball: ^Ball, bat: ^Bat, bricks: []Brick) {
 	for &brick in bricks {
 		if brick.active && rl.CheckCollisionRecs(ball.rect, brick.rect) {
 			brick.active = false
+
 			overlap_left := ball.rect.x + ball.rect.width - brick.rect.x
 			overlap_right := brick.rect.x + brick.rect.width - ball.rect.x
 			overlap_top := ball.rect.y + ball.rect.height - brick.rect.y
 			overlap_bottom := brick.rect.y + brick.rect.height - ball.rect.y
+
 			min_overlap := min(overlap_left, overlap_right, overlap_top, overlap_bottom)
-			if min_overlap == overlap_left || min_overlap == overlap_right {
+
+			if min_overlap == overlap_left {
+				ball.rect.x -= overlap_left
 				ball.velX = -ball.velX
+			} else if min_overlap == overlap_right {
+				ball.rect.x += overlap_right
+				ball.velX = -ball.velX
+			} else if min_overlap == overlap_top {
+				ball.rect.y -= overlap_top
+				ball.velY = -ball.velY
 			} else {
+				ball.rect.y += overlap_bottom
 				ball.velY = -ball.velY
 			}
 		}
