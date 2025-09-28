@@ -19,6 +19,8 @@ A breakout-style game built in [Odin](https://odin-lang.org) with [raylib](https
 | R     | Restart after Game Over / Win         |
 | ESC   | Quit the game                         |
 
+## Build & Run
+
 ### Build
 
 ```bash
